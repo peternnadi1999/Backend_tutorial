@@ -48,7 +48,7 @@ const getUserById = async (req, res) => {
 
 const createUser = async (req, res) => {
 	try {
-		const { name, role, email } = req.body;
+		const { name, job_title, email } = req.body;
 
 		if (!name?.trim()) {
 			return res.status(400).json({
@@ -56,9 +56,9 @@ const createUser = async (req, res) => {
 			});
 		}
 
-		if (!role?.trim()) {
+		if (!job_title?.trim()) {
 			return res.status(400).json({
-				message: "Role is required",
+				message: "Job title is required",
 			});
 		}
 
@@ -70,7 +70,7 @@ const createUser = async (req, res) => {
 
 		const user = await userService.createUser(
 			name.trim(),
-			role.trim(),
+			job_title.trim(),
 			email.trim(),
 		);
 
@@ -109,11 +109,11 @@ const updateUser = async (req, res) => {
 			});
 		}
 
-		const { name, role } = req.body;
+		const { name, job_title } = req.body;
 
-		if (name === undefined && role === undefined) {
+		if (name === undefined && job_title === undefined) {
 			return res.status(400).json({
-				message: "Provide name or role to update",
+				message: "Provide name or job title to update",
 			});
 		}
 
@@ -123,13 +123,13 @@ const updateUser = async (req, res) => {
 			});
 		}
 
-		if (role !== undefined && !role?.trim()) {
+		if (job_title !== undefined && !job_title?.trim()) {
 			return res.status(400).json({
-				message: "Role cannot be empty",
+				message: "Job title cannot be empty",
 			});
 		}
 
-		const user = await userService.updateUser(id, name?.trim(), role?.trim());
+		const user = await userService.updateUser(id, name?.trim(), job_title?.trim());
 
 		if (!user) {
 			return res.status(404).json({
@@ -146,6 +146,53 @@ const updateUser = async (req, res) => {
 
 		return res.status(500).json({
 			message: "Failed to update user",
+		});
+	}
+};
+
+const updateUserRole = async (req, res) => {
+	try {
+		const id = Number(req.params.id);
+
+		if (Number.isNaN(id)) {
+			return res.status(400).json({
+				message: "Invalid user ID",
+			});
+		}
+
+		const { role } = req.body;
+
+		if (!role?.trim()) {
+			return res.status(400).json({
+				message: "Role is required",
+			});
+		}
+
+		const allowedRoles = ["user", "admin"];
+
+		if (!allowedRoles.includes(role?.trim())) {
+			return res.status(400).json({
+				message: "Invalid role. Role must be either 'admin' or 'user'",
+			});
+		}
+
+		const user = await userService.updateUserRole(id, role);
+
+		if (!user) {
+			return res.status(404).json({
+				message: "User not found",
+			});
+		}
+
+		return res.status(200).json({
+			message: "User role updated successfully",
+			user,
+		});
+	} catch (error) {
+		console.error("Error updating user role:", error);
+
+		return res.status(500).json({
+			message: "Failed to update user role",
 		});
 	}
 };
@@ -186,5 +233,6 @@ module.exports = {
 	getUserById,
 	createUser,
 	updateUser,
+	updateUserRole,
 	deleteUser,
 };

@@ -2,7 +2,7 @@ const authService = require("../services/auth.service");
 
 const register = async (req, res) => {
 	try {
-		const { name, email, role, password } = req.body;
+		const { name, email, job_title, password } = req.body;
 
 		if (!name?.trim()) {
 			return res.status(400).json({
@@ -16,9 +16,9 @@ const register = async (req, res) => {
 			});
 		}
 
-		if (!role?.trim()) {
+		if (!job_title?.trim()) {
 			return res.status(400).json({
-				message: "Role is required",
+				message: "Job title is required",
 			});
 		}
 
@@ -34,7 +34,7 @@ const register = async (req, res) => {
 			});
 		}
 
-		const user = await authService.register(name, email, role, password);
+		const user = await authService.register(name, email, job_title, password);
 
 		return res.status(201).json({
 			message: "User registered successfully",
