@@ -38,11 +38,7 @@ const getPostById = async (req, res) => {
 			post,
 		});
 	} catch (error) {
-		console.error("Error fetching post:", error);
-
-		return res.status(500).json({
-			message: "Failed to fetch post",
-		});
+		next(error);
 	}
 };
 
@@ -133,7 +129,7 @@ const updatePost = async (req, res) => {
 			});
 		}
 
-		const updatedPost = await postService.updatePost(postId, title, content);
+		const updatedPost = await postService.updatePost(postId, title, content, id);
 
 		return res.status(200).json({
 			message: "Post updated successfully",
@@ -148,42 +144,49 @@ const updatePost = async (req, res) => {
 };
 
 const deletePost = async (req, res) => {
-	try {
-		const postId = Number(req.params.id);
+    try {
+        const postId = Number(req.params.id);
 
-		if (isNaN(postId)) {
-			return res.status(400).json({
-				message: "Invalid post ID",
-			});
-		}
-		const { id, role } = req.user;
-		const post = await postService.getPostById(postId);
+        if (isNaN(postId)) {
+            return res.status(400).json({
+                message: "Invalid post ID",
+            });
+        }
+
+        const { id, role } = req.user;
+
+        // Your ownership/admin authorization
+        const post = await postService.getPostById(postId);
 
         if (!post) {
-			return res.status(404).json({
-				message: "Post not found",
-			});
-		}
+            return res.status(404).json({
+                message: "Post not found",
+            });
+        }
 
+        if (role !== "admin" && post.user_id !== id) {
+            return res.status(403).json({
+                message: "You are not authorized to delete this post",
+            });
+        }
 
-		if (role !== "admin" && post.user_id !== id) {
-			return res.status(403).json({
-				message: "You are not authorized to delete this post",
-			});
-		}
+        const deletedPost = await postService.deletePost(
+            postId,
+            id
+        );
 
-		const deletedPost = await postService.deletePost(postId);
+        return res.status(200).json({
+            message: "Post deleted successfully",
+            post: deletedPost,
+        });
 
-		return res.status(200).json({
-			message: "Post deleted successfully",
-			post: deletedPost,
-		});
-	} catch (error) {
-		console.error("Error deleting post:", error);
-		return res.status(500).json({
-			message: "Failed to delete post",
-		});
-	}
+    } catch (error) {
+        console.error("Error deleting post:", error);
+
+        return res.status(500).json({
+            message: "Failed to delete post",
+        });
+    }
 };
 
 module.exports = {

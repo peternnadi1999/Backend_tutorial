@@ -17,6 +17,11 @@ const getUserById = async (id) => {
 	const result = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
 
 	const user = result.rows[0];
+	
+	 if (!result.rows[0]) {
+        throw new AppError("User not found", 404);
+    }
+
 	return {
 		id: user.id,
 		name: user.name,

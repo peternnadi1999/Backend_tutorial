@@ -1,39 +1,47 @@
 const jwt = require("jsonwebtoken");
+const AppError = require("../errors/AppError");
 
 const authenticate = (req, res, next) => {
-	try {
-		const authHeader = req.headers.authorization;
+    try {
+        const authHeader = req.headers.authorization;
 
-		if (!authHeader) {
-			return res.status(401).json({
-				message: "Authentication required",
-			});
-		}
+        if (!authHeader) {
+            throw new AppError(
+                "Authentication required",
+                401
+            );
+        }
 
-		const [type, token] = authHeader.split(" ");
+        const token = authHeader.split(" ")[1];
 
-		if (type !== "Bearer" || !token) {
-			return res.status(401).json({
-				message: "Invalid authorization format",
-			});
-		}
+        if (!token) {
+            throw new AppError(
+                "Authentication required",
+                401
+            );
+        }
 
-		if (!token) {
-			return res.status(401).json({
-				message: "Authentication required",
-			});
-		}
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET
+        );
 
-		const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
 
-		req.user = decoded;
+        next();
 
-		next();
-	} catch (error) {
-		return res.status(401).json({
-			message: "Invalid or expired token",
-		});
-	}
+    } catch (error) {
+        if (error instanceof jwt.JsonWebTokenError) {
+            return next(
+                new AppError(
+                    "Invalid or expired token",
+                    401
+                )
+            );
+        }
+
+        next(error);
+    }
 };
 
 module.exports = authenticate;

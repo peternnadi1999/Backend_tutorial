@@ -1,4 +1,6 @@
 const pool = require("../db/pool");
+const activityService = require("./activity.service");
+
 
 const getPosts = async () => {
 	const result = await pool.query(`
@@ -28,21 +30,47 @@ const getPostById = async (postId) => {
 		[postId],
 	);
 
+    if (!result.rows[0]) {
+        throw new AppError("Post not found", 404);
+    }
+
 	return result.rows[0];
 };
 
 const createPost = async (title, content, userId) => {
-	const result = await pool.query(
-		`INSERT INTO posts (title, content, user_id)
-         VALUES ($1, $2, $3)
-         RETURNING *`,
-		[title, content, userId],
-	);
+	const client = await pool.connect();
+	try {
+		await client.query("BEGIN");
 
-	return result.rows[0];
+		const postResult = await client.query(
+			`INSERT INTO posts (title, content, user_id)
+             VALUES ($1, $2, $3)
+             RETURNING *`,
+			[title, content, userId],
+		);
+
+		const post = postResult.rows[0];
+
+		await activityService.createActivity(
+            client,
+            userId,
+            "created_post",
+            post.id
+        );
+
+		await client.query("COMMIT");
+
+		return post;
+        
+	} catch (error) {
+		await client.query("ROLLBACK");
+		throw error;
+	} finally {
+		client.release();
+	}
 };
 
-const updatePost = async (postId, title, content) => {
+const updatePost = async (postId, title, content, userId) => {
     const fields = [];
     const values = [];
 
@@ -59,26 +87,92 @@ const updatePost = async (postId, title, content) => {
     const idParameter = values.length + 1;
     values.push(postId);
 
-    const result = await pool.query(
-        `UPDATE posts
-         SET ${fields.join(", ")}
-         WHERE id = $${idParameter}
-         RETURNING id, title, content, user_id`,
-        values
-    );
+    const client = await pool.connect();
 
-    return result.rows[0];
+    try {
+        await client.query("BEGIN");
+
+        const result = await client.query(
+            `UPDATE posts
+             SET ${fields.join(", ")}
+             WHERE id = $${idParameter}
+             RETURNING id, title, content, user_id`,
+            values
+        );
+
+        const post = result.rows[0];
+
+        if (!post) {
+            await client.query("ROLLBACK");
+            return null;
+        }
+
+        await activityService.createActivity(
+            client,
+            userId,
+            "updated_post",
+            post.id
+        );
+
+        await client.query("COMMIT");
+
+        return post;
+
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+
+    } finally {
+        client.release();
+    }
 };
 
-const deletePost = async (postId) => {
-    const result = await pool.query(
-        `DELETE FROM posts
-         WHERE id = $1
-         RETURNING *`,
-        [postId]
-    );
+const deletePost = async (postId, userId) => {
+    const client = await pool.connect();
 
-    return result.rows[0];
+    try {
+        await client.query("BEGIN");
+
+        const result = await client.query(
+            `SELECT id
+             FROM posts
+             WHERE id = $1
+             FOR UPDATE`,
+            [postId]
+        );
+
+        const post = result.rows[0];
+
+        if (!post) {
+            await client.query("ROLLBACK");
+            return null;
+        }
+
+        await activityService.createActivity(
+            client,
+            userId,
+            "deleted_post",
+            post.id
+        );
+
+        const deleteResult = await client.query(
+            `DELETE FROM posts
+             WHERE id = $1
+             RETURNING id, title, content, user_id`,
+            [postId]
+        );
+
+        await client.query("COMMIT");
+
+        return deleteResult.rows[0];
+
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+
+    } finally {
+        client.release();
+    }
 };
 
 module.exports = {
@@ -86,5 +180,5 @@ module.exports = {
 	getPosts,
 	getPostById,
 	updatePost,
-    deletePost,
+	deletePost,
 };

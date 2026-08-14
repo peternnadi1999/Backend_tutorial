@@ -41,17 +41,7 @@ const register = async (req, res) => {
 			user,
 		});
 	} catch (error) {
-		console.error("Error registering user:", error);
-
-		if (error.code === "23505") {
-			return res.status(409).json({
-				message: "Email already exists",
-			});
-		}
-
-		return res.status(500).json({
-			message: "Failed to register user",
-		});
+		next(error);
 	}
 };
 
@@ -84,11 +74,7 @@ const login = async (req, res) => {
             user,
         });
     } catch (error) {
-        console.error("Error logging in user:", error);
-
-        return res.status(401).json({
-            message: "Invalid credentials",
-        });
+       next(error);
     }
 };
 
