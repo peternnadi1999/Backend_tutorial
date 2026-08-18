@@ -1,6 +1,7 @@
 const pool = require("../db/pool");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const AppError = require("../errors/AppError");
 
 const register = async (name, email, job_title, password) => {
 	const hashedPassword = await bcrypt.hash(password, 10);
@@ -28,13 +29,13 @@ const login = async (email, password) => {
 	const user = result.rows[0];
 
 	if (!user) {
-		throw new Error("Invalid credentials");
+		throw new AppError("Invalid credentials", 401);
 	}
 
 	const isMatch = await bcrypt.compare(password, user.password);
 
 	if (!isMatch) {
-		throw new Error("Invalid credentials");
+		throw new AppError("Invalid credentials", 401);
 	}
 
 	const token = jwt.sign(

@@ -1,38 +1,8 @@
 const authService = require("../services/auth.service");
 
-const register = async (req, res) => {
+const register = async (req, res, next) => {
 	try {
 		const { name, email, job_title, password } = req.body;
-
-		if (!name?.trim()) {
-			return res.status(400).json({
-				message: "Name is required",
-			});
-		}
-
-		if (!email?.trim()) {
-			return res.status(400).json({
-				message: "Email is required",
-			});
-		}
-
-		if (!job_title?.trim()) {
-			return res.status(400).json({
-				message: "Job title is required",
-			});
-		}
-
-        if (!password?.trim()) {
-            return res.status(400).json({
-                message: "Password is required",
-            });
-        }
-
-		if (password.trim().length < 8) {
-			return res.status(400).json({
-				message: "Password must be at least 8 characters",
-			});
-		}
 
 		const user = await authService.register(name, email, job_title, password);
 
@@ -45,21 +15,9 @@ const register = async (req, res) => {
 	}
 };
 
-const login = async (req, res) => {
+const login = async (req, res, next) => {
     try {
         const { email, password } = req.body;   
-
-        if (!email?.trim()) {
-            return res.status(400).json({
-                message: "Email is required",
-            });
-        }
-        
-        if (!password?.trim()) {
-            return res.status(400).json({
-                message: "Password is required",
-            });
-        }
 
         const user = await authService.login(email, password);
 

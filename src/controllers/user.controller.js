@@ -1,6 +1,6 @@
 const userService = require("../services/user.service");
 
-const getUsers = async (req, res) => {
+const getUsers = async (req, res, next) => {
 	try {
 		const users = await userService.getUsers();
 
@@ -8,15 +8,11 @@ const getUsers = async (req, res) => {
 			users,
 		});
 	} catch (error) {
-		console.error("Error fetching users:", error);
-
-		return res.status(500).json({
-			message: "Failed to fetch users",
-		});
+		next(error);
 	}
 };
 
-const getUserById = async (req, res) => {
+const getUserById = async (req, res, next) => {
 	try {
 		const id = Number(req.params.id);
 
@@ -42,7 +38,7 @@ const getUserById = async (req, res) => {
 	}
 };
 
-const createUser = async (req, res) => {
+const createUser = async (req, res, next) => {
 	try {
 		const { name, job_title, email } = req.body;
 
@@ -75,27 +71,11 @@ const createUser = async (req, res) => {
 			user,
 		});
 	} catch (error) {
-		console.error("Error creating user:", error);
-
-		if (error.code === "23505") {
-			return res.status(400).json({
-				message: "Email already exists",
-			});
-		}
-
-		if (error.code === "23502") {
-			return res.status(400).json({
-				message: "Required field is missing",
-			});
-		}
-
-		return res.status(500).json({
-			message: "Failed to create user",
-		});
+		next(error);
 	}
 };
 
-const updateUser = async (req, res) => {
+const updateUser = async (req, res, next) => {
 	try {
 		const id = Number(req.params.id);
 
@@ -138,15 +118,11 @@ const updateUser = async (req, res) => {
 			user,
 		});
 	} catch (error) {
-		console.error("Error updating user:", error);
-
-		return res.status(500).json({
-			message: "Failed to update user",
-		});
+		next(error);
 	}
 };
 
-const updateUserRole = async (req, res) => {
+const updateUserRole = async (req, res, next) => {
 	try {
 		const id = Number(req.params.id);
 
@@ -185,15 +161,11 @@ const updateUserRole = async (req, res) => {
 			user,
 		});
 	} catch (error) {
-		console.error("Error updating user role:", error);
-
-		return res.status(500).json({
-			message: "Failed to update user role",
-		});
+		next(error);
 	}
 };
 
-const deleteUser = async (req, res) => {
+const deleteUser = async (req, res, next) => {
 	try {
 		const id = Number(req.params.id);
 
@@ -216,11 +188,7 @@ const deleteUser = async (req, res) => {
 			user,
 		});
 	} catch (error) {
-		console.error("Error deleting user:", error);
-
-		return res.status(500).json({
-			message: "Failed to delete user",
-		});
+		next(error);
 	}
 };
 

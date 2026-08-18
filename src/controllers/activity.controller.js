@@ -1,6 +1,10 @@
 const activityService = require("../services/activity.service");
+const {
+    encodeCursor,
+    decodeCursor,
+} = require("../utils/cursor");
 
-const getActivities = async (req, res) => {
+const getActivities = async (req, res, next) => {
     try {
         const { id, role } = req.user;
 
@@ -16,14 +20,59 @@ const getActivities = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error fetching activities:", error);
+        next(error);
+    }
+};
 
-        return res.status(500).json({
-            message: "Failed to fetch activities",
+
+
+const getMyActivities = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+
+        const { limit, cursor: cursorString } = req.query;
+
+        let cursor = null;
+
+        if (cursorString) {
+            cursor = decodeCursor(cursorString);
+        }
+
+        const rows = await activityService.getUserActivities(
+            userId,
+            limit,
+            cursor
+        );
+
+        const hasMore = rows.length > limit;
+
+        const activities = hasMore
+            ? rows.slice(0, limit)
+            : rows;
+
+        let nextCursor = null;
+
+        if (hasMore) {
+            const lastActivity =
+                activities[activities.length - 1];
+
+            nextCursor = encodeCursor({
+                createdAt: lastActivity.created_at,
+                id: lastActivity.id,
+            });
+        }
+
+        return res.status(200).json({
+            activities,
+            nextCursor,
+            hasMore,
         });
+    } catch (error) {
+        next(error);
     }
 };
 
 module.exports = {
     getActivities,
+    getMyActivities
 };

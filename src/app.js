@@ -17,6 +17,6 @@ app.use(authRoutes);
 app.use(postRoutes);
 app.use("/api", activityRoutes);
 
-app.use(errorHandler);
 
+app.use(errorHandler);
 module.exports = app;

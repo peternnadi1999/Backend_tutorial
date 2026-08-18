@@ -1,38 +1,30 @@
 const postService = require("../services/post.service");
 
-const getPosts = async (req, res) => {
+const getPosts = async (req, res, next) => {
 	try {
-		const posts = await postService.getPosts();
+		const { page, limit } = req.validated.query;
+
+        const result = await postService.getPosts(
+            page,
+            limit
+        );
 
 		return res.status(200).json({
-			posts,
+			result,
 		});
 	} catch (error) {
-		console.error("Error fetching posts:", error);
-
-		return res.status(500).json({
-			message: "Failed to fetch posts",
-		});
+		next(error);
 	}
 };
 
-const getPostById = async (req, res) => {
+const getPostById = async (req, res, next) => {
 	try {
-		const postId = Number(req.params.id);
 
-		if (isNaN(postId)) {
-			return res.status(400).json({
-				message: "Invalid post ID",
-			});
-		}
+		const post = await postService.getPostById(req.params.id);
 
-		const post = await postService.getPostById(postId);
-
-		if (!post) {
-			return res.status(404).json({
-				message: "Post not found",
-			});
-		}
+		 if (!post) {
+            throw new AppError("Post not found", 404);
+        }
 
 		return res.status(200).json({
 			post,
@@ -42,33 +34,11 @@ const getPostById = async (req, res) => {
 	}
 };
 
-const createPost = async (req, res) => {
+const createPost = async (req, res, next) => {
 	try {
 		const { title, content } = req.body;
 		const userId = req.user.id;
 
-		// validate title
-		if (!title?.trim()) {
-			return res.status(400).json({
-				message: "Title is required",
-			});
-		}
-		if (title.trim().length < 5) {
-			return res.status(400).json({
-				message: "Title must be at least 5 characters",
-			});
-		}
-		// validate content
-		if (!content?.trim()) {
-			return res.status(400).json({
-				message: "Content is required",
-			});
-		}
-		if (content.trim().length < 10) {
-			return res.status(400).json({
-				message: "Content must be at least 10 characters",
-			});
-		}
 		const post = await postService.createPost(title, content, userId);
 
 		return res.status(201).json({
@@ -76,23 +46,14 @@ const createPost = async (req, res) => {
 			post,
 		});
 	} catch (error) {
-		console.error("Error creating post:", error);
-		return res.status(500).json({
-			message: "Failed to create post",
-		});
+		next(error);
 	}
 };
 
-const updatePost = async (req, res) => {
+const updatePost = async (req, res, next) => {
 	try {
-		const postId = Number(req.params.id);
 		const { title, content } = req.body;
 
-		if (isNaN(postId)) {
-			return res.status(400).json({
-				message: "Invalid post ID",
-			});
-		}
 
 		if (title === undefined && content === undefined) {
 			return res.status(400).json({
@@ -115,12 +76,10 @@ const updatePost = async (req, res) => {
 		}
 
 		const { id, role } = req.user;
-		const post = await postService.getPostById(postId);
+		const post = await postService.getPostById(req.params.id);
 
 		if (!post) {
-			return res.status(404).json({
-				message: "Post not found",
-			});
+			throw new AppError("Post not found", 404);
 		}
 
 		if (role !== "admin" && post.user_id !== id) {
@@ -136,32 +95,19 @@ const updatePost = async (req, res) => {
 			post: updatedPost,
 		});
 	} catch (error) {
-		console.error("Error updating post:", error);
-		return res.status(500).json({
-			message: "Failed to update post",
-		});
+		next(error);
 	}
 };
 
-const deletePost = async (req, res) => {
+const deletePost = async (req, res, next) => {
     try {
-        const postId = Number(req.params.id);
-
-        if (isNaN(postId)) {
-            return res.status(400).json({
-                message: "Invalid post ID",
-            });
-        }
-
         const { id, role } = req.user;
 
         // Your ownership/admin authorization
-        const post = await postService.getPostById(postId);
+        const post = await postService.getPostById(req.params.id);
 
         if (!post) {
-            return res.status(404).json({
-                message: "Post not found",
-            });
+            throw new AppError("Post not found", 404);
         }
 
         if (role !== "admin" && post.user_id !== id) {
@@ -181,11 +127,7 @@ const deletePost = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error deleting post:", error);
-
-        return res.status(500).json({
-            message: "Failed to delete post",
-        });
+        next(error);
     }
 };
 

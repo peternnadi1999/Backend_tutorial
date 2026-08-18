@@ -1,9 +1,13 @@
 const pool = require("../db/pool");
 const activityService = require("./activity.service");
+const AppError = require("../errors/AppError");
 
 
-const getPosts = async () => {
-	const result = await pool.query(`
+const getPosts = async (page, limit) => {
+    const offset = (page - 1) * limit;
+
+    const postsResult = await pool.query(
+        `
         SELECT
             posts.id,
             posts.title,
@@ -15,9 +19,35 @@ const getPosts = async () => {
         JOIN users
             ON posts.user_id = users.id
         ORDER BY posts.id DESC
-    `);
+        LIMIT $1
+        OFFSET $2
+        `,
+        [limit, offset]
+    );
 
-	return result.rows;
+    const countResult = await pool.query(
+        `
+        SELECT COUNT(*) AS total
+        FROM posts
+        `
+    );
+
+    const total = Number(countResult.rows[0].total);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+        data: postsResult.rows,
+
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPreviousPage: page > 1,
+        },
+    };
 };
 
 const getPostById = async (postId) => {

@@ -17,7 +17,7 @@ const getUserById = async (id) => {
 	const result = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
 
 	const user = result.rows[0];
-	
+
 	 if (!result.rows[0]) {
         throw new AppError("User not found", 404);
     }
@@ -37,6 +37,10 @@ const createUser = async (name, job_title, email) => {
          RETURNING *`,
 		[name, job_title, email],
 	);
+
+	if (!result.rows[0]) {
+		throw new AppError("Failed to create user", 500);
+	}
 
 	return result.rows[0];
 };
@@ -69,6 +73,10 @@ const updateUser = async (id, name, job_title) => {
 
 	const user = result.rows[0];
 
+	if (!user) {
+		throw new AppError("User not found", 404);
+	}
+
 	return {
 		id: user.id,
 		name: user.name,
@@ -86,6 +94,9 @@ const updateUserRole = async (id, role) => {
 		[role, id],
 	);
 
+	if (!result.rows[0]) {
+		throw new AppError("User not found", 404);
+	}
 	return result.rows[0];
 };
 
@@ -96,6 +107,10 @@ const deleteUser = async (id) => {
 	);
 
 	const user = result.rows[0];
+
+	if (!user) {
+		throw new AppError("User not found", 404);
+	}
 	return {
 		id: user.id,
 		name: user.name,

@@ -74,6 +74,46 @@ const getActivities = async (userId, isAdmin) => {
     return result.rows;
 };
 
+
+const getUserActivities = async (userId, limit, cursor) => {
+    const values = [userId];
+
+    let query = `
+        SELECT
+            id,
+            user_id,
+            action,
+            post_id,
+            order_id,
+            created_at
+        FROM activities
+        WHERE user_id = $1
+    `;
+
+    if (cursor) {
+        query += `
+            AND (created_at, id) < ($2, $3)
+        `;
+
+        values.push(cursor.createdAt);
+        values.push(cursor.id);
+    }
+
+    const limitParameter = values.length + 1;
+
+    query += `
+        ORDER BY created_at DESC, id DESC
+        LIMIT $${limitParameter}
+    `;
+
+    values.push(limit + 1);
+
+    const result = await pool.query(query, values);
+
+    return result.rows;
+};
+
+
 const createActivity = async (
     client,
     userId,
@@ -92,7 +132,9 @@ const createActivity = async (
     return result.rows[0];
 };
 
+
 module.exports = {
     getActivities,
+    getUserActivities,
     createActivity,
 };
