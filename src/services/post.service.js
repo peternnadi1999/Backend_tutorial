@@ -1,13 +1,14 @@
 const pool = require("../db/pool");
-const activityService = require("./activity.service");
 const AppError = require("../errors/AppError");
-
+const postRepository = require("../repositories/post.repository");
+const activityRepository = require("../repositories/activity.repository");
+const withTransaction = require("../utils/transaction");
 
 const getPosts = async (page, limit) => {
-    const offset = (page - 1) * limit;
+	const offset = (page - 1) * limit;
 
-    const postsResult = await pool.query(
-        `
+	const postsResult = await pool.query(
+		`
         SELECT
             posts.id,
             posts.title,
@@ -22,187 +23,118 @@ const getPosts = async (page, limit) => {
         LIMIT $1
         OFFSET $2
         `,
-        [limit, offset]
-    );
+		[limit, offset],
+	);
 
-    const countResult = await pool.query(
-        `
+	const countResult = await pool.query(
+		`
         SELECT COUNT(*) AS total
         FROM posts
-        `
-    );
+        `,
+	);
 
-    const total = Number(countResult.rows[0].total);
+	const total = Number(countResult.rows[0].total);
 
-    const totalPages = Math.ceil(total / limit);
+	const totalPages = Math.ceil(total / limit);
 
-    return {
-        data: postsResult.rows,
+	return {
+		data: postsResult.rows,
 
-        pagination: {
-            page,
-            limit,
-            total,
-            totalPages,
-            hasNextPage: page < totalPages,
-            hasPreviousPage: page > 1,
-        },
-    };
+		pagination: {
+			page,
+			limit,
+			total,
+			totalPages,
+			hasNextPage: page < totalPages,
+			hasPreviousPage: page > 1,
+		},
+	};
 };
 
 const getPostById = async (postId) => {
-	const result = await pool.query(
-		`SELECT posts.id,
-    posts.title,
-    posts.content,
-    posts.user_id,
-     users.name AS author_name, users.email AS author_email FROM posts JOIN users ON posts.user_id = users.id WHERE posts.id = $1`,
-		[postId],
-	);
+	const post = await postRepository.getPostById(postId);
 
-    if (!result.rows[0]) {
-        throw new AppError("Post not found", 404);
-    }
-
-	return result.rows[0];
+	if (!post) {
+		throw new AppError("Post not found", 404);
+	}
+	return post;
 };
 
 const createPost = async (title, content, userId) => {
-	const client = await pool.connect();
-	try {
-		await client.query("BEGIN");
-
-		const postResult = await client.query(
-			`INSERT INTO posts (title, content, user_id)
-             VALUES ($1, $2, $3)
-             RETURNING *`,
-			[title, content, userId],
+	return withTransaction(async (client) => {
+		const post = await postRepository.createPost(
+			client,
+			title,
+			content,
+			userId,
 		);
 
-		const post = postResult.rows[0];
-
-		await activityService.createActivity(
-            client,
-            userId,
-            "created_post",
-            post.id
-        );
-
-		await client.query("COMMIT");
+		await activityRepository.createActivity(
+			client,
+			userId,
+			post.id,
+			"created_post",
+		);
 
 		return post;
-        
-	} catch (error) {
-		await client.query("ROLLBACK");
-		throw error;
-	} finally {
-		client.release();
-	}
+	});
 };
 
-const updatePost = async (postId, title, content, userId) => {
-    const fields = [];
-    const values = [];
+const updatePost = async (postId, title, content, userId, role) => {
+	return withTransaction(async (client) => {
+		const post = await postRepository.getPostByIdForUpdate(client, postId);
 
-    if (title !== undefined) {
-        fields.push(`title = $${values.length + 1}`);
-        values.push(title.trim());
-    }
+		if (!post) {
+			throw new AppError("Post not found", 404);
+		}
 
-    if (content !== undefined) {
-        fields.push(`content = $${values.length + 1}`);
-        values.push(content.trim());
-    }
+		const isOwner = post.user_id === userId;
+		const isAdmin = role === "admin";
 
-    const idParameter = values.length + 1;
-    values.push(postId);
+		if (!isOwner && !isAdmin) {
+			throw new AppError("You are not authorized to update this post", 403);
+		}
 
-    const client = await pool.connect();
+		const updatedPost = await postRepository.updatePost(
+			client,
+			postId,
+			title,
+			content,
+		);
 
-    try {
-        await client.query("BEGIN");
+		await activityRepository.createActivity(
+			client,
+			userId,
+			postId,
+			"updated_post",
+		);
 
-        const result = await client.query(
-            `UPDATE posts
-             SET ${fields.join(", ")}
-             WHERE id = $${idParameter}
-             RETURNING id, title, content, user_id`,
-            values
-        );
-
-        const post = result.rows[0];
-
-        if (!post) {
-            await client.query("ROLLBACK");
-            return null;
-        }
-
-        await activityService.createActivity(
-            client,
-            userId,
-            "updated_post",
-            post.id
-        );
-
-        await client.query("COMMIT");
-
-        return post;
-
-    } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-
-    } finally {
-        client.release();
-    }
+		return updatedPost;
+	});
 };
+const deletePost = async (postId, userId, role) => {
+	return withTransaction(async (client) => {
+		const post = await postRepository.getPostByIdForUpdate(client, postId);
 
-const deletePost = async (postId, userId) => {
-    const client = await pool.connect();
+		if (!post) {
+			throw new AppError("Post not found", 404);
+		}
 
-    try {
-        await client.query("BEGIN");
+		if (role !== "admin" && post.user_id !== userId) {
+			throw new AppError("You cannot delete this post", 403);
+		}
 
-        const result = await client.query(
-            `SELECT id
-             FROM posts
-             WHERE id = $1
-             FOR UPDATE`,
-            [postId]
-        );
+		const deleteResult = await postRepository.deletePost(client, postId);
 
-        const post = result.rows[0];
+		await activityRepository.createActivity(
+			client,
+			userId,
+			postId,
+			"deleted_post",
+		);
 
-        if (!post) {
-            await client.query("ROLLBACK");
-            return null;
-        }
-
-        await activityService.createActivity(
-            client,
-            userId,
-            "deleted_post",
-            post.id
-        );
-
-        const deleteResult = await client.query(
-            `DELETE FROM posts
-             WHERE id = $1
-             RETURNING id, title, content, user_id`,
-            [postId]
-        );
-
-        await client.query("COMMIT");
-
-        return deleteResult.rows[0];
-
-    } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-
-    } finally {
-        client.release();
-    }
+		return deleteResult;
+	});
 };
 
 module.exports = {

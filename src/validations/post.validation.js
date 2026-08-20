@@ -19,6 +19,30 @@ const postQuerySchema = z.object({
         .default(10),
 });
 
+const postUpdateSchema = z
+    .object({
+        title: z
+            .string()
+            .trim()
+            .min(2, "Title must be at least 2 characters")
+            .optional(),
+
+        content: z
+            .string()
+            .trim()
+            .min(2, "Content must be at least 2 characters")
+            .optional(),
+    })
+    .refine(
+        (data) =>
+            data.title !== undefined ||
+            data.content !== undefined,
+        {
+            message:
+                "At least one of title or content must be provided for update",
+        }
+    );
+
 const postSchema = z.object({
     title: z
         .string()
@@ -33,5 +57,6 @@ const postSchema = z.object({
 module.exports = {
     postIdSchema,
     postQuerySchema,
+    postUpdateSchema,
     postSchema
 };
