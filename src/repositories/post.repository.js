@@ -1,5 +1,34 @@
 const pool = require("../db/pool");
 
+const getPosts = async (page, limit) => {
+    const offset = (page - 1) * limit;
+
+    const result = await pool.query(
+        `SELECT posts.id,
+         posts.title,
+         posts.content,
+         posts.user_id,
+         users.name AS author_name,
+         users.email AS author_email
+         FROM posts
+         JOIN users ON posts.user_id = users.id
+         ORDER BY posts.id DESC
+         LIMIT $1 OFFSET $2`,
+        [limit, offset]
+    );
+
+    return result.rows;
+};
+
+
+const getTotalPostsCount = async () => {
+    const result = await pool.query(
+        `SELECT COUNT(*) AS total FROM posts`
+    );
+
+    return Number(result.rows[0].total);
+}
+
 const getPostById = async (postId) => {
 	const result = await pool.query(
 		`SELECT posts.id,
@@ -83,6 +112,8 @@ const deletePost = async (client, postId) => {
 module.exports = {
 	getPostById,
     updatePost, 
+    getPosts,
+    getTotalPostsCount,
 	createPost,
     getPostByIdForUpdate,
 	deletePost,

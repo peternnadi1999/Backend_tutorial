@@ -36,7 +36,32 @@ const login = async (req, res, next) => {
     }
 };
 
+const refreshAccessToken = async (req, res, next) => {
+    try {
+        const refreshToken = req.cookies.refreshToken;
+
+        const result = await authService.refreshAccessToken(
+            refreshToken
+        );
+
+        res.cookie("refreshToken", result.refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            path: "/api/auth",
+        });
+
+        return res.status(200).json({
+            accessToken: result.accessToken,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
 	register,
 	login,
+    refreshAccessToken,
 };

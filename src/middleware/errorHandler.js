@@ -1,9 +1,29 @@
+const { ZodError } = require("zod");
+
 const errorHandler = (err, req, res, next) => {
     console.error(err);
 
-    // PostgreSQL unique constraint violation
+      // Zod validation errors
+    if (err instanceof ZodError) {
+        const errors = {};
+
+        for (const issue of err.issues) {
+            const field = issue.path.join(".");
+
+            errors[field] = issue.message;
+        }
+
+        return res.status(400).json({
+            success: false,
+            message: "Validation failed",
+            errors,
+        });
+    }
+
+    // PostgreSQL unique constraint
     if (err.code === "23505") {
         return res.status(409).json({
+            success: false,
             message: "Resource already exists",
         });
     }
@@ -11,27 +31,31 @@ const errorHandler = (err, req, res, next) => {
     // PostgreSQL foreign key violation
     if (err.code === "23503") {
         return res.status(400).json({
+            success: false,
             message: "Referenced resource does not exist",
         });
     }
 
-    // PostgreSQL not-null violation
+    // PostgreSQL NOT NULL violation
     if (err.code === "23502") {
         return res.status(400).json({
+            success: false,
             message: "Required field is missing",
         });
     }
 
-    // Application errors
+    // Operational/application errors
     if (err.isOperational) {
-        return res.status(err.statusCode).json({
-            message: err.message,
-            ...(err.errors && { errors: err.errors }),
-        });
-    }
+    return res.status(err.statusCode).json({
+        success: false,
+        message: err.message,
+        code: err.code,
+    });
+}
 
-    // Unknown/unexpected errors
+    // Unexpected errors
     return res.status(500).json({
+        success: false,
         message: "Internal server error",
     });
 };

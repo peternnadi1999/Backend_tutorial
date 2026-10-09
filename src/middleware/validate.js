@@ -1,3 +1,5 @@
+const AppError = require("../errors/AppError");
+
 const validate = (schema, property = "body") => {
     return (req, res, next) => {
         const result = schema.safeParse(req[property]);
